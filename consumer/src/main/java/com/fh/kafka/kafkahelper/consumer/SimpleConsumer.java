@@ -26,7 +26,7 @@ public class SimpleConsumer {
 
         //2.订阅Topic
         //创建一个只包含单个元素的列表，Topic的名字叫作customerCountries
-        consumer.subscribe(Collections.singletonList("msg"));
+        consumer.subscribe(Collections.singletonList(kafkaConfig.getTopic()));
 
         return consumer;
     }
@@ -44,8 +44,9 @@ public class SimpleConsumer {
                 }
                 for (ConsumerRecord<String, String> record : records) {
                     int number = count.incrementAndGet();
-                    LOGGER.info("【普通消费者】No.{}: {}", number, record.value());
+                    LOGGER.info("【普通消费者】No.{} parition: {}, offset: {}, value: {}", number, record.partition(), record.offset(),record.value());
                 }
+                consumer.commitAsync();
             }
         } catch (Exception e) {
             LOGGER.error("消费异常", e);

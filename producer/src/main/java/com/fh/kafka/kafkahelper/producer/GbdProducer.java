@@ -10,6 +10,7 @@ import sun.java2d.windows.GDIBlitLoops;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 生产者
@@ -38,8 +39,13 @@ public class GbdProducer {
         init();
 
         try {
-            ProducerRecord<String, String> record = new ProducerRecord<>(topic, value);
+//            ProducerRecord<String, String> record = new ProducerRecord<>(topic, value);
+//            producer.send(record);
+            int v = Integer.parseInt(value);
+            ProducerRecord<String, String> record = new ProducerRecord<>(topic, v % 3, "test", value);
             producer.send(record);
+            LOGGER.info("发送消息: {}, partition: {}.", v, v % 3);
+
         } catch (Exception e) {
             LOGGER.error("发送消息异常", e);
         } finally {
@@ -70,12 +76,13 @@ public class GbdProducer {
 
     }
 
-    public static void main(String[] args) {
-        List<String> msgList = new ArrayList<>();
+    public static void main(String[] args) throws InterruptedException {
+//        List<String> msgList = new ArrayList<>();
         for (int i = 0; i < 10; i++) {
-            msgList.add(String.format("%d", i));
+            GbdProducer.send("msg", String.format("%d", i));
+            TimeUnit.SECONDS.sleep(3);
         }
-        GbdProducer.send("msg", msgList);
-        LOGGER.info("【生产者】消息发送完成, size: {}.", msgList.size());
+
+//        LOGGER.info("【生产者】消息发送完成, size: {}.", msgList.size());
     }
 }

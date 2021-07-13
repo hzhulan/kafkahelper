@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -24,7 +25,9 @@ public class GbdConsumerFactory {
 
     private KafkaConfig kafkaConfig;
 
-    private Map<TopicPartition, OffsetAndMetadata> offsetsMap = new HashMap<>();
+    private Map<TopicPartition, OffsetAndMetadata> offsetsMap = new ConcurrentHashMap<>();
+
+    private Map<TopicPartition, Long> currentOffset = new ConcurrentHashMap<>();
 
     public GbdConsumerFactory(String name) {
         this.name = name;
@@ -54,18 +57,33 @@ public class GbdConsumerFactory {
                 LOGGER.error("【等待中断】", e);
             }
 
-            LOGGER.info("【{}排队等待获取执行权限】", name);
+//            LOGGER.info("【{}排队等待获取执行权限】", name);
         }
 
         if (consumer == null) {
 
-            consumer = buildConsumer();
+            final KafkaConsumer newConsumer = buildConsumer();
 
-            consumer.subscribe(Arrays.asList(this.kafkaConfig.getTopic()), new GbdConsumerRebalanceListener(consumer, offsetsMap));
+//            consumer.subscribe(Arrays.asList(this.kafkaConfig.getTopic()), new GbdConsumerRebalanceListener(consumer, offsetsMap));
+            consumer.subscribe(Arrays.asList(this.kafkaConfig.getTopic()), new ConsumerRebalanceListener() {
+                @Override
+                public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
+                    commitOffset(currentOffset);
+                }
+
+                @Override
+                public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+                    for (TopicPartition partition : partitions) {
+                        newConsumer.seek(partition, getOffset(partition));
+                    }
+                }
+            });
+
+
             consumer.resume(consumer.assignment());
-            LOGGER.info("【{}重新上线】", name);
+//            LOGGER.info("【{}重新上线】", name);
         } else {
-            LOGGER.info("【{}初次上线】", name);
+//            LOGGER.info("【{}初次上线】", name);
         }
 
 
@@ -83,24 +101,31 @@ public class GbdConsumerFactory {
 
                     data.add(record.value());
 
-                    Collections.sort(data);
+//                    Collections.sort(data);
 
-                    LOGGER.info("【{}消费消息】partition: {}\toffset: {}\t value: {}.\ndata: {}.", name, data,
+                    LOGGER.info("【{}消费消息】partition: {}\toffset: {}\t value: {}.\ndata: {}.", name,
                             record.partition(), record.offset(), record.value(), data);
 
                     count.decrementAndGet();
 
 
                     // 设置需要提交的偏移量
+
                     offsetsMap.put(new TopicPartition(record.topic(), record.partition()),
                             new OffsetAndMetadata(record.offset() + 1, "no metadata"));
 
-                    consumer.commitAsync(offsetsMap, new OffsetCommitCallback() {
-                        @Override
-                        public void onComplete(Map<TopicPartition, OffsetAndMetadata> offsets, Exception exception) {
-                            System.out.println("提交位移异常");
-                        }
-                    });
+                    currentOffset.put(new TopicPartition(record.topic(), record.partition()), record.offset() + 1);
+
+//                    LOGGER.info("【offset】{}", offsetsMap);
+
+//                    consumer.commitAsync(offsetsMap, new OffsetCommitCallback() {
+//                        @Override
+//                        public void onComplete(Map<TopicPartition, OffsetAndMetadata> offsets, Exception exception) {
+//                            System.out.println("提交位移异常");
+//                        }
+//                    });
+
+                    consumer.commitSync();
 
                     new Thread(() -> {
                         try {
@@ -120,10 +145,20 @@ public class GbdConsumerFactory {
 
             consumer.unsubscribe();//此处不取消订阅暂停太久会出现订阅超时的错误
             consumer.pause(consumer.assignment());
-            LOGGER.info("【{}下线，暂停工作】time: {}", name, System.currentTimeMillis() / 1000L);
+//            LOGGER.info("【{}下线，暂停工作】time: {}", name, System.currentTimeMillis() / 1000L);
         }
 
         this.consume(null);
+    }
+
+
+    /** ============================ 自定义offset， 可以放到数据库中进行维护 ================================= */
+    private static long getOffset(TopicPartition partition) {
+        return 0;
+    }
+
+    private static void commitOffset(Map<TopicPartition, Long> currentOffset) {
+
     }
 
 }

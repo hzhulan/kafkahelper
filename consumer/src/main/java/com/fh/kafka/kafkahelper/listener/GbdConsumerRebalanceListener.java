@@ -29,11 +29,22 @@ public class GbdConsumerRebalanceListener implements ConsumerRebalanceListener {
 
     @Override
     public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-        consumer.commitAsync(offsetsMap, null);
+        LOGGER.info("【GbdConsumerRebalanceListener-offset】{}", offsetsMap);
     }
 
     @Override
     public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+        for (TopicPartition partition : partitions) {
+
+        }
+    }
+
+    /** ============================ 自定义offset， 可以放到数据库中进行维护 ================================= */
+    private static long getOffset(TopicPartition partition) {
+        return 0;
+    }
+
+    private static void commitOffset(Map<TopicPartition, Long> currentOffset) {
 
     }
 }
