@@ -1,7 +1,6 @@
 package com.fh.kafka.kafkahelper.consumer;
 
 import com.fh.kafka.kafkahelper.common.bean.KafkaConfig;
-import com.fh.kafka.kafkahelper.listener.GbdConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
@@ -25,65 +24,75 @@ public class GbdConsumerFactory {
 
     private KafkaConfig kafkaConfig;
 
-    private Map<TopicPartition, OffsetAndMetadata> offsetsMap = new ConcurrentHashMap<>();
+    private KafkaConsumer<String, String> consumer;
 
-    private Map<TopicPartition, Long> currentOffset = new ConcurrentHashMap<>();
+    /**
+     * 测试使用暂时用静态map存放，如果分布式，需要持久化到数据库中
+     */
+    private static Map<TopicPartition, OffsetAndMetadata> currentOffset = new ConcurrentHashMap<>();
 
     public GbdConsumerFactory(String name) {
         this.name = name;
         this.kafkaConfig = new KafkaConfig();
+        buildConsumer();
     }
 
-    public KafkaConsumer buildConsumer() {
-
-        String topic = this.kafkaConfig.getTopic();
+    public void buildConsumer() {
 
         //1.创建消费者
-        KafkaConsumer<String, String> consumer = new KafkaConsumer<>(this.kafkaConfig.buildConsumerProps());
+        this.consumer = new KafkaConsumer<>(this.kafkaConfig.buildConsumerProps());
 
         //2.订阅Topic
-        //创建一个只包含单个元素的列表，Topic的名字叫作customerCountries
-        consumer.subscribe(Collections.singletonList(topic));
+        this.consumer.subscribe(Collections.singletonList(this.kafkaConfig.getTopic()));
 
-        return consumer;
     }
 
-    public void consume(KafkaConsumer consumer) {
+    public void consume(boolean isFirst) {
+
+        LOGGER.info("【{}】上线", this.name);
 
         while (count.get() <= 0) {
             try {
-                TimeUnit.SECONDS.sleep(15);
+                TimeUnit.SECONDS.sleep(5);
             } catch (InterruptedException e) {
                 LOGGER.error("【等待中断】", e);
             }
 
-//            LOGGER.info("【{}排队等待获取执行权限】", name);
+            LOGGER.info("【{}排队等待获取执行权限】", name);
         }
 
-        if (consumer == null) {
+        if (!isFirst) {
+            consumer.subscribe(Collections.singletonList(this.kafkaConfig.getTopic()), new ConsumerRebalanceListener() {
 
-            final KafkaConsumer newConsumer = buildConsumer();
-
-//            consumer.subscribe(Arrays.asList(this.kafkaConfig.getTopic()), new GbdConsumerRebalanceListener(consumer, offsetsMap));
-            consumer.subscribe(Arrays.asList(this.kafkaConfig.getTopic()), new ConsumerRebalanceListener() {
+                /**
+                 * rebalance之前调用
+                 * @param partitions
+                 */
                 @Override
                 public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
+                    LOGGER.info("=============== 重平衡开始 ==============");
                     commitOffset(currentOffset);
                 }
 
+                /**
+                 * rebalance之后调用
+                 * @param partitions
+                 */
                 @Override
                 public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-                    for (TopicPartition partition : partitions) {
-                        newConsumer.seek(partition, getOffset(partition));
+                    try {
+                        for (TopicPartition partition : partitions) {
+                            if (getOffset(partition) != null) {
+                                consumer.seek(partition, getOffset(partition));
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOGGER.error("重平衡异常", e);
                     }
+                    LOGGER.info("=============== 重平衡结束 ==============");
                 }
             });
-
-
             consumer.resume(consumer.assignment());
-//            LOGGER.info("【{}重新上线】", name);
-        } else {
-//            LOGGER.info("【{}初次上线】", name);
         }
 
 
@@ -95,13 +104,10 @@ public class GbdConsumerFactory {
                 for (ConsumerRecord<String, String> record : records) {
 
                     while (count.get() <= 0) {
-
                         break outWhile;
                     }
 
                     data.add(record.value());
-
-//                    Collections.sort(data);
 
                     LOGGER.info("【{}消费消息】partition: {}\toffset: {}\t value: {}.\ndata: {}.", name,
                             record.partition(), record.offset(), record.value(), data);
@@ -110,22 +116,10 @@ public class GbdConsumerFactory {
 
 
                     // 设置需要提交的偏移量
+                    currentOffset.put(new TopicPartition(record.topic(), record.partition()), new OffsetAndMetadata(record.offset() + 1));
 
-                    offsetsMap.put(new TopicPartition(record.topic(), record.partition()),
-                            new OffsetAndMetadata(record.offset() + 1, "no metadata"));
-
-                    currentOffset.put(new TopicPartition(record.topic(), record.partition()), record.offset() + 1);
-
-//                    LOGGER.info("【offset】{}", offsetsMap);
-
-//                    consumer.commitAsync(offsetsMap, new OffsetCommitCallback() {
-//                        @Override
-//                        public void onComplete(Map<TopicPartition, OffsetAndMetadata> offsets, Exception exception) {
-//                            System.out.println("提交位移异常");
-//                        }
-//                    });
-
-                    consumer.commitSync();
+                    // 提交偏移量
+                    commitOffset(currentOffset);
 
                     new Thread(() -> {
                         try {
@@ -145,20 +139,40 @@ public class GbdConsumerFactory {
 
             consumer.unsubscribe();//此处不取消订阅暂停太久会出现订阅超时的错误
             consumer.pause(consumer.assignment());
-//            LOGGER.info("【{}下线，暂停工作】time: {}", name, System.currentTimeMillis() / 1000L);
+            LOGGER.info("【{}下线，暂停工作】time: {}", name, System.currentTimeMillis() / 1000L);
         }
 
-        this.consume(null);
+        LOGGER.info("【等待上线】");
+        try {
+            TimeUnit.SECONDS.sleep(1);
+        } catch (InterruptedException e) {
+            LOGGER.error("中断", e);
+        }
+
+        this.consume(false);
     }
 
 
-    /** ============================ 自定义offset， 可以放到数据库中进行维护 ================================= */
-    private static long getOffset(TopicPartition partition) {
-        return 0;
+    /**
+     * ============================ 自定义offset， 可以放到数据库中进行维护 =================================
+     */
+    private Long getOffset(TopicPartition partition) {
+        if (currentOffset.get(partition) == null) {
+            return null;
+        }
+        return currentOffset.get(partition).offset();
     }
 
-    private static void commitOffset(Map<TopicPartition, Long> currentOffset) {
+    private void commitOffset(Map<TopicPartition, OffsetAndMetadata> currentOffset) {
 
+        this.consumer.commitAsync(currentOffset, new OffsetCommitCallback() {
+            @Override
+            public void onComplete(Map<TopicPartition, OffsetAndMetadata> offsets, Exception exception) {
+                if (exception != null) {
+                    LOGGER.info("commit失败！！！！！！！！！！！！！！！！！");
+                }
+            }
+        });
     }
 
 }

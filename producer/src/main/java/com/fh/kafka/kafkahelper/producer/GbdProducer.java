@@ -5,12 +5,9 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.java2d.windows.GDIBlitLoops;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
-import java.util.concurrent.TimeUnit;
 
 /**
  * 生产者
@@ -78,11 +75,15 @@ public class GbdProducer {
 
     public static void main(String[] args) throws InterruptedException {
 //        List<String> msgList = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            GbdProducer.send("msg", String.format("%d", i));
-            TimeUnit.SECONDS.sleep(3);
+//        for (int i = 0; i < 10; i++) {
+//            GbdProducer.send("msg", String.format("%d", i));
+//            TimeUnit.SECONDS.sleep(3);
+//        }
+        List<String> msgList = new ArrayList<>();
+        for (int i = 10; i < 20; i++) {
+            msgList.add(String.format("%d", i));
         }
-
+        GbdProducer.send(kafkaConfig.getTopic(), msgList);
 //        LOGGER.info("【生产者】消息发送完成, size: {}.", msgList.size());
     }
 }

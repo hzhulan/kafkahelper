@@ -13,7 +13,7 @@ public class MultiDemo {
 
             pool.execute(() -> {
                 GbdConsumerFactory factory = new GbdConsumerFactory(String.format("%d号工厂", count.getAndIncrement()));
-                factory.consume(factory.buildConsumer());
+                factory.consume(true);
             });
         }
     }
