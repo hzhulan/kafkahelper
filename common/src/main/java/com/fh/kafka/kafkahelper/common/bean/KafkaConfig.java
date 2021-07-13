@@ -25,7 +25,7 @@ public class KafkaConfig {
     }
 
     public void buildBootStrapServer(Properties props) {
-        props.put("bootstrap.servers", this.bootStrapServer);
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, this.bootStrapServer);
     }
 
     public void buildGroupId(Properties props) {
@@ -36,7 +36,6 @@ public class KafkaConfig {
         Properties props = new Properties();
 
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "kafka-master:9092,kafka-slave1:9093,kafka-slave2:9094");
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
         props.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG, "1000");
         props.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, "30000");
