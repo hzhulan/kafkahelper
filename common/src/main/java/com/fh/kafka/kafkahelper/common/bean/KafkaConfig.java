@@ -1,6 +1,5 @@
 package com.fh.kafka.kafkahelper.common.bean;
 
-import com.sun.istack.internal.NotNull;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 
@@ -58,7 +57,6 @@ public class KafkaConfig {
         buildBootStrapServer(props);
         return props;
     }
-
 
 
 }
