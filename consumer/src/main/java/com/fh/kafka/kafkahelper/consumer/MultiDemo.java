@@ -12,8 +12,8 @@ public class MultiDemo {
         for (int i = 0; i < 3; i++) {
 
             pool.execute(() -> {
-                GbdConsumerFactory factory = new GbdConsumerFactory(String.format("%d号工厂", count.getAndIncrement()));
-                factory.consume(true);
+                ConsumerFactory factory = new ConsumerFactory(String.format("%d号工厂", count.getAndIncrement()));
+                factory.consume();
             });
         }
     }
