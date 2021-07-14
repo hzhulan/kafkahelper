@@ -17,9 +17,9 @@ import java.util.concurrent.TimeUnit;
  * 例如： 3个分区对应最多3个消费者同时消费，一个消费者对应一个分区。但是消费者A的并发用完了，一直卡着，他对应分区后面的消息无法被其他消费者消费到，
  * 形成了消息积压，这个时候会将该消费者“下线”， 让其消费者B或消费者C“兼职”消费该分区。
  */
-public class ConsumerFactory {
+public class ConcurrentConsumer {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ConsumerFactory.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ConcurrentConsumer.class);
 
     private String name;
 
@@ -33,11 +33,26 @@ public class ConsumerFactory {
     private KafkaConsumer<String, String> consumer;
 
     /**
-     * 测试使用暂时用静态map存放，如果分布式，需要持久化到数据库中
+     * 抢救时间，单位：秒
      */
-    private static Map<TopicPartition, OffsetAndMetadata> currentOffset = new ConcurrentHashMap<>();
+    private static final int RESCUE_SECOND = 3;
 
-    public ConsumerFactory(String name) {
+    /**
+     * 模拟任务执行时间，单位：秒
+     */
+    private static final int TASK_EXECUTE_TIME = 5;
+
+    /**
+     * 重新订阅时间间隔，单位：秒
+     */
+    private static final int RESUBSCRIBE_PERIOD = 15;
+
+    /**
+     * 测试使用暂时用，可以持久化到数据库中
+     */
+    private Map<TopicPartition, OffsetAndMetadata> currentOffset = new ConcurrentHashMap<>();
+
+    public ConcurrentConsumer(String name) {
         this.name = name;
         this.kafkaConfig = new KafkaConfig();
         buildConsumer();
@@ -63,8 +78,6 @@ public class ConsumerFactory {
      */
     private void consume(boolean isFirst) {
 
-        LOGGER.info("【{}】上线", this.name);
-
         // 阻塞等待
         waitForExecute();
 
@@ -72,10 +85,12 @@ public class ConsumerFactory {
             reSubscribe();
         }
 
+        LOGGER.info("【{}】上线", this.name);
+
 
         try {
             outWhile:
-            while (count.get() > 0) {
+            while (count.hasAuth()) {
 
                 ConsumerRecords<String, String> records = consumer.poll(100);
                 for (ConsumerRecord<String, String> record : records) {
@@ -87,8 +102,8 @@ public class ConsumerFactory {
 
                     // 日志打印，可忽略
                     data.add(record.value());
-                    LOGGER.info("【{}消费消息】partition: {}\toffset: {}\t value: {}.\ndata: {}.", name,
-                            record.partition(), record.offset(), record.value(), data);
+                    LOGGER.info("【{}消费消息】size: {}, partition: {}, offset: {}, value: {}\ndata: {}.", name,
+                            data.size(),record.partition(), record.offset(), record.value(), data);
 
                     // 获取执行资格
                     count.acquire();
@@ -102,7 +117,7 @@ public class ConsumerFactory {
                     // 执行内容
                     new Thread(() -> {
                         try {
-                            TimeUnit.SECONDS.sleep(5);
+                            TimeUnit.SECONDS.sleep(TASK_EXECUTE_TIME);
                         } catch (InterruptedException e) {
                             LOGGER.error("等待中断", e);
                         } finally {
@@ -129,9 +144,9 @@ public class ConsumerFactory {
      * 阻塞等待执行权限
      */
     private void waitForExecute() {
-        while (count.get() <= 0) {
+        while (!count.hasAuth()) {
             try {
-                TimeUnit.SECONDS.sleep(5);
+                TimeUnit.SECONDS.sleep(RESUBSCRIBE_PERIOD);
             } catch (InterruptedException e) {
                 LOGGER.error("【等待中断】", e);
             }
@@ -186,7 +201,7 @@ public class ConsumerFactory {
      */
     private boolean rescue() {
         try {
-            TimeUnit.SECONDS.sleep(10);
+            TimeUnit.SECONDS.sleep(RESCUE_SECOND);
         } catch (InterruptedException e) {
             LOGGER.error("【抢救中断】", e);
         }
@@ -198,7 +213,7 @@ public class ConsumerFactory {
 
         this.consumer.unsubscribe();//此处不取消订阅暂停太久会出现订阅超时的错误
         this.consumer.pause(consumer.assignment());
-        LOGGER.info("【{}下线，暂停工作】time: {}", name, System.currentTimeMillis() / 1000L);
+        LOGGER.info("【{}下线，暂停工作】", name);
 
         return false;
     }
@@ -215,11 +230,16 @@ public class ConsumerFactory {
 
     private void commitOffset() {
 
-        this.consumer.commitAsync((offsets, exception) -> {
+        this.consumer.commitAsync(currentOffset, (offsets, exception) -> {
             if (exception != null) {
-                LOGGER.info("commit失败！！！！！！！！！！！！！！！！！");
+                LOGGER.info("commit失败, ！！！！！！！！！！！！！！！！！");
             }
         });
     }
 
+
+    public static void main(String[] args) {
+        ConcurrentConsumer factory = new ConcurrentConsumer(String.format("消费者"));
+        factory.consume();
+    }
 }

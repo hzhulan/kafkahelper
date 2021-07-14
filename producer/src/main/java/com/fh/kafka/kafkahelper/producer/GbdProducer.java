@@ -73,17 +73,11 @@ public class GbdProducer {
 
     }
 
-    public static void main(String[] args) throws InterruptedException {
-//        List<String> msgList = new ArrayList<>();
-//        for (int i = 0; i < 10; i++) {
-//            GbdProducer.send("msg", String.format("%d", i));
-//            TimeUnit.SECONDS.sleep(3);
-//        }
+    public static void main(String[] args) {
         List<String> msgList = new ArrayList<>();
-        for (int i = 10; i < 20; i++) {
+        for (int i = 0; i < 10; i++) {
             msgList.add(String.format("%d", i));
         }
         GbdProducer.send(kafkaConfig.getTopic(), msgList);
-//        LOGGER.info("【生产者】消息发送完成, size: {}.", msgList.size());
     }
 }
