@@ -45,7 +45,7 @@ public class ConcurrentConsumer {
     /**
      * 重新订阅时间间隔，单位：秒
      */
-    private static final int RESUBSCRIBE_PERIOD = 15;
+    private static final int RESUBSCRIBE_PERIOD = 180;
 
     /**
      * 测试使用暂时用，可以持久化到数据库中

@@ -82,9 +82,6 @@ public class SimpleConsumer {
             while (true) {
                 ConsumerRecords<String, String> records = consumer.poll(100);
 
-                if (!records.isEmpty()) {
-                    LOGGER.info("\n===============time: {}===============\n", System.currentTimeMillis()/1000L);
-                }
                 for (ConsumerRecord<String, String> record : records) {
                     int number = count.incrementAndGet();
                     LOGGER.info("【普通消费者】No.{} parition: {}, offset: {}, value: {}", number, record.partition(), record.offset(),record.value());
