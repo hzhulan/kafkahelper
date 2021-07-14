@@ -232,7 +232,7 @@ public class ConcurrentConsumer {
 
         this.consumer.commitAsync(currentOffset, (offsets, exception) -> {
             if (exception != null) {
-                LOGGER.info("commit失败, ！！！！！！！！！！！！！！！！！");
+                LOGGER.info("commit失败！！！！！！！！！！！！！！！！！");
             }
         });
     }
