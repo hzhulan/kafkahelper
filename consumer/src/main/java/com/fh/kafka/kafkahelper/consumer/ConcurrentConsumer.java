@@ -95,9 +95,12 @@ public class ConcurrentConsumer {
                 ConsumerRecords<String, String> records = consumer.poll(100);
                 for (ConsumerRecord<String, String> record : records) {
 
-                    // 无执行权限，退出
+                    // 消费者抢救，如果等待后仍无权限，退出循环，下线
                     if (!count.hasAuth()) {
-                        break outWhile;
+                        TimeUnit.SECONDS.sleep(RESCUE_SECOND);
+                        if (!count.hasAuth()) {
+                            break outWhile;
+                        }
                     }
 
                     // 日志打印，可忽略
@@ -132,12 +135,9 @@ public class ConcurrentConsumer {
             LOGGER.error("执行异常", e);
         }
 
-        // 等待下线
-        if (rescue()) {
-            this.consume(true);
-        } else {
-            this.consume(false);
-        }
+        // 下线
+        logout();
+        this.consume(false);
     }
 
     /**
@@ -197,25 +197,11 @@ public class ConcurrentConsumer {
     }
 
     /**
-     * 客户端抢救
+     * 消费者下线
      */
-    private boolean rescue() {
-        try {
-            TimeUnit.SECONDS.sleep(RESCUE_SECOND);
-        } catch (InterruptedException e) {
-            LOGGER.error("【抢救中断】", e);
-        }
-
-        if (count.hasAuth()) {
-            LOGGER.info("【抢救成功，继续消费】");
-            return true;
-        }
-
+    private void logout() {
         this.consumer.unsubscribe();//此处不取消订阅暂停太久会出现订阅超时的错误
         this.consumer.pause(consumer.assignment());
-        LOGGER.info("【{}下线，暂停工作】", name);
-
-        return false;
     }
 
     /**
