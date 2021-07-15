@@ -235,6 +235,8 @@ public class ConcurrentConsumer {
                 LOGGER.info("commit失败！！！！！！！！！！！！！！！！！");
             }
         });
+
+        currentOffset.clear();
     }
 
 

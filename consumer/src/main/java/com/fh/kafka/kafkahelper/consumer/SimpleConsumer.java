@@ -112,6 +112,8 @@ public class SimpleConsumer {
                 LOGGER.info("commit失败！！！！！！！！！！！！！！！！！");
             }
         });
+
+        currentOffset.clear();
     }
 
     public static void main(String[] args) {
