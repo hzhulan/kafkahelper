@@ -8,7 +8,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 需求：kafka的消费者中消费消息后，调用第三方工具发送异步任务，但是第三方工具的并发有一定的限制，需要我们进行控制
@@ -227,7 +230,19 @@ public class ConcurrentConsumer {
 
 
     public static void main(String[] args) {
-        ConcurrentConsumer factory = new ConcurrentConsumer(String.format("消费者"));
-        factory.consume();
+        ThreadPoolExecutor pool = new ThreadPoolExecutor(3, 3, 3000, TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>());
+        AtomicInteger count = new AtomicInteger(0);
+        for (int i = 0; i < 3; i++) {
+            pool.execute(() -> {
+                ConcurrentConsumer factory = new ConcurrentConsumer(String.format("消费者%d", count.incrementAndGet()));
+                factory.consume();
+            });
+            try {
+                TimeUnit.SECONDS.sleep(1);
+            } catch (InterruptedException e) {
+                LOGGER.error("中断", e);
+            }
+        }
+
     }
 }
