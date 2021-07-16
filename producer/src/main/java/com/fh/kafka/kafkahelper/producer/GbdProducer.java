@@ -36,8 +36,6 @@ public class GbdProducer {
         init();
 
         try {
-//            ProducerRecord<String, String> record = new ProducerRecord<>(topic, value);
-//            producer.send(record);
             int v = Integer.parseInt(value);
             ProducerRecord<String, String> record = new ProducerRecord<>(topic, v % 3, "test", value);
             producer.send(record);
