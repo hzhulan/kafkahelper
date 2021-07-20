@@ -73,7 +73,7 @@ public class GbdProducer {
 
     public static void main(String[] args) {
         List<String> msgList = new ArrayList<>();
-        for (int i = 0; i < 2; i++) {
+        for (int i = 0; i < 12; i++) {
             msgList.add(String.format("%d", i));
         }
         GbdProducer.send(kafkaConfig.getTopic(), msgList);
