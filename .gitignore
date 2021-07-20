@@ -1,2 +1,4 @@
-/common/target/
-.idea/*
+.idea
+/log
+/*/target
+*.iml
