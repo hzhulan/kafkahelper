@@ -1,0 +1,15 @@
+server:
+  port: 8080
+  tomcat:
+    uri-encoding: utf-8
+spring:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgres://localhost:5432/test?characterEncoding=utf8&useSSL=true
+    username: postgres
+    password: postgres
+
+logging:
+  file: log/consumer.log
+  level:
+    com.fh.kafka.kafkahelper: debug
